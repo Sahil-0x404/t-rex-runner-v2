@@ -1,63 +1,71 @@
-/* Copyright 2013 The Chromium Authors. All rights reserved.
- * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file. */
+/* ════════════════════════════════════════════════════════════
+   T-Rex: Prehistoric Jungle — Complete Stylesheet
+   ════════════════════════════════════════════════════════════ */
 
+/* ── Reset & Base ───────────────────────────────────────────── */
 html, body {
   padding: 0;
   margin: 0;
   width: 100%;
   height: 100%;
-}
-
-.icon {
-  -webkit-user-select: none;
+  background: #03050c;
+  overflow: hidden;
   user-select: none;
-  display: inline-block;
+  -webkit-user-select: none;
 }
 
-.icon-offline {
-  content: -webkit-image-set( url(assets/default_100_percent/100-error-offline.png) 1x, url(assets/default_200_percent/200-error-offline.png) 2x);
-  position: relative;
-}
-
-.hidden {
-  display: none;
-}
-
-
-/* Offline page */
-
-.offline .interstitial-wrapper {
-  color: #2b2b2b;
-  font-size: 1em;
-  line-height: 1.55;
-  margin: 0 auto;
-  max-width: 600px;
-  padding-top: 100px;
+/* ── Background Canvas ──────────────────────────────────────── */
+#jungle-bg-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── Game Canvas & Containers ───────────────────────────────── */
+.offline .interstitial-wrapper {
+  margin: 0 auto;
+  max-width: 800px;
+  width: 95%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 12vh;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+  background: transparent !important;
 }
 
 .offline .runner-container {
   height: 150px;
-  max-width: 600px;
-  overflow: hidden;
-  position: absolute;
-  top: 35px;
-  width: 44px;
+  width: 100%;
+  max-width: 800px;
+  position: relative;
+  overflow: visible;
+  margin: 0 auto;
+  background: transparent !important;
 }
 
-.offline .runner-canvas {
+.offline .runner-canvas,
+.offline canvas {
   height: 150px;
-  max-width: 600px;
+  max-width: 100%;
   opacity: 1;
-  overflow: hidden;
   position: absolute;
   top: 0;
+  left: 0;
   z-index: 2;
+  background: transparent !important;
+  image-rendering: pixelated;
 }
 
 .offline .controller {
-  background: rgba(247, 247, 247, .1);
+  background: transparent !important;
   height: 100vh;
   left: 0;
   position: absolute;
@@ -66,100 +74,426 @@ html, body {
   z-index: 1;
 }
 
+#main-content,
+#main-frame-error h1,
+.icon-offline,
+#buttons,
 #offline-resources {
-  display: none;
+  display: none !important;
 }
 
-@media (max-width: 420px) {
-  .suggested-left > #control-buttons, .suggested-right > #control-buttons {
-    float: none;
-  }
-  .snackbar {
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    border-radius: 0;
-  }
+.hidden {
+  display: none !important;
 }
 
-@media (max-height: 350px) {
-  h1 {
-    margin: 0 0 15px;
-  }
-  .icon-offline {
-    margin: 0 0 10px;
-  }
-  .interstitial-wrapper {
-    margin-top: 5%;
-  }
-  .nav-wrapper {
-    margin-top: 30px;
-  }
+/* ════════════════════════════════════════════════════════════
+   JUNGLE UI OVERLAYS
+   ════════════════════════════════════════════════════════════ */
+
+.jungle-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  background: rgba(3, 7, 18, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: opacity 0.35s ease;
 }
 
-@media (min-width: 600px) and (max-width: 736px) and (orientation: landscape) {
-  .offline .interstitial-wrapper {
-    margin-left: 0;
-    margin-right: 0;
-  }
+.jungle-panel {
+  background: linear-gradient(160deg, #091c13 0%, #071324 55%, #0d0920 100%);
+  border: 1px solid rgba(0, 255, 170, 0.3);
+  border-radius: 16px;
+  box-shadow:
+    0 0 35px rgba(0, 255, 170, 0.22),
+    0 0 70px rgba(180, 0, 220, 0.15),
+    inset 0 0 25px rgba(0, 0, 0, 0.6);
+  padding: 36px 44px;
+  max-width: 460px;
+  width: 90vw;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
 }
 
-@media (min-width: 420px) and (max-width: 736px) and (min-height: 240px) and (max-height: 420px) and (orientation:landscape) {
-  .interstitial-wrapper {
-    margin-bottom: 100px;
-  }
+.jungle-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00ffaa, #ff40cc, #00ffaa, transparent);
+  animation: borderGlow 3s linear infinite;
 }
 
-@media (min-height: 240px) and (orientation: landscape) {
-  .offline .interstitial-wrapper {
-    margin-bottom: 90px;
-  }
-  .icon-offline {
-    margin-bottom: 20px;
-  }
+@keyframes borderGlow {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
 }
 
-@media (max-height: 320px) and (orientation: landscape) {
-  .icon-offline {
-    margin-bottom: 0;
-  }
-  .offline .runner-container {
+.title-emoji {
+  font-size: 54px;
+  margin-bottom: 6px;
+  animation: floatDino 3s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes floatDino {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+
+.game-title {
+  font-family: 'Press Start 2P', monospace, sans-serif;
+  font-size: clamp(20px, 4vw, 26px);
+  color: #00ffcc;
+  margin: 0 0 4px 0;
+  text-shadow:
+    0 0 16px rgba(0, 255, 204, 0.8),
+    0 0 32px rgba(0, 200, 150, 0.4);
+  letter-spacing: 2px;
+}
+
+.game-subtitle {
+  font-family: 'Press Start 2P', monospace, sans-serif;
+  font-size: clamp(9px, 2vw, 11px);
+  color: #ff55cc;
+  margin: 0 0 24px 0;
+  text-shadow: 0 0 12px rgba(255, 85, 204, 0.6);
+  letter-spacing: 2px;
+}
+
+.menu-hint {
+  font-family: 'Share Tech Mono', monospace;
+  color: rgba(160, 255, 210, 0.75);
+  font-size: 14px;
+  margin: 0 0 24px 0;
+}
+
+.menu-hint kbd {
+  background: rgba(0, 255, 170, 0.15);
+  border: 1px solid rgba(0, 255, 170, 0.45);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-family: inherit;
+  color: #00ffaa;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.jg-btn {
+  font-family: 'Press Start 2P', monospace, sans-serif;
+  font-size: 11px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.jg-btn:active {
+  transform: scale(0.97);
+}
+
+.jg-btn-primary {
+  background: linear-gradient(135deg, #00cc88, #00995e);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(0, 200, 130, 0.5), 0 0 0 1px rgba(0, 255, 170, 0.4);
+}
+
+.jg-btn-primary:hover {
+  background: linear-gradient(135deg, #00ffaa, #00cc88);
+  box-shadow: 0 4px 26px rgba(0, 255, 170, 0.75), 0 0 0 1px #00ffaa;
+  transform: translateY(-1px);
+}
+
+.jg-btn-secondary {
+  background: linear-gradient(135deg, #330055, #1e0036);
+  color: #e599ff;
+  box-shadow: 0 4px 14px rgba(160, 0, 255, 0.35), 0 0 0 1px rgba(200, 100, 255, 0.3);
+}
+
+.jg-btn-secondary:hover {
+  background: linear-gradient(135deg, #550088, #3b0060);
+  box-shadow: 0 4px 22px rgba(200, 80, 255, 0.55), 0 0 0 1px #dd77ff;
+  transform: translateY(-1px);
+}
+
+/* ── Controls Hint Bar ──────────────────────────────────────── */
+.controls-hint {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: rgba(100, 215, 170, 0.6);
+  border-top: 1px solid rgba(0, 255, 170, 0.12);
+  padding-top: 14px;
+}
+
+/* ── Game Over & Leaderboard Screen ─────────────────────────── */
+.final-score {
+  font-family: 'Press Start 2P', monospace, sans-serif;
+  font-size: clamp(14px, 3vw, 18px);
+  color: #ffffff;
+  text-shadow: none;
+  margin: 0 0 20px 0;
+}
+
+.new-hs-section {
+  background: rgba(0, 255, 170, 0.08);
+  border: 1px solid rgba(0, 255, 170, 0.28);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+.new-hs-label {
+  font-family: 'Press Start 2P', monospace, sans-serif;
+  font-size: 9px;
+  color: #ffdd44;
+  text-shadow: 0 0 8px rgba(255, 220, 70, 0.6);
+  margin: 0 0 10px 0;
+}
+
+.name-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(0, 255, 170, 0.4);
+  border-radius: 6px;
+  color: #00ffcc;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 15px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  outline: none;
+}
+
+.name-input:focus {
+  border-color: #00ffcc;
+  box-shadow: 0 0 12px rgba(0, 255, 204, 0.4);
+}
+
+.lb-wrapper {
+  margin-bottom: 20px;
+}
+
+.lb-title {
+  font-family: 'Press Start 2P', monospace, sans-serif;
+  font-size: 9px;
+  color: #ffcc00;
+  text-shadow: 0 0 8px rgba(255, 200, 0, 0.5);
+  margin: 0 0 10px 0;
+}
+
+.lb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+}
+
+.lb-table th {
+  color: rgba(0, 230, 170, 0.6);
+  font-size: 10px;
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(0, 200, 140, 0.2);
+  text-align: left;
+}
+
+.lb-table .lb-row td {
+  padding: 7px 8px;
+  color: rgba(220, 255, 240, 0.88);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.lb-table .lb-row:first-child td { color: #ffd700; }
+.lb-table .lb-row:nth-child(2) td { color: #c8c8c8; }
+.lb-table .lb-row:nth-child(3) td { color: #cd7f32; }
+.lb-score { color: #00ffcc !important; font-weight: bold; }
+.lb-date  { color: rgba(140, 200, 180, 0.5) !important; font-size: 11px; }
+
+/* ── Audio Controls (fixed top-right) ──────────────────────── */
+.audio-controls {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 200;
+  background: rgba(4, 12, 22, 0.7);
+  border: 1px solid rgba(0, 255, 170, 0.25);
+  border-radius: 20px;
+  padding: 6px 12px;
+  backdrop-filter: blur(8px);
+}
+
+.mute-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  padding: 0;
+  transition: transform 0.15s;
+}
+
+.mute-btn:hover {
+  transform: scale(1.15);
+}
+
+.vol-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 68px;
+  height: 4px;
+  background: rgba(0, 200, 140, 0.3);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #00ffaa;
+  box-shadow: 0 0 6px rgba(0, 255, 170, 0.8);
+  cursor: pointer;
+}
+
+/* ── In-Game High-Visibility HUD ───────────────────────────── */
+/* ── In-Game Score Counter (Clean Crisp White, No Glow) ────── */
+.jungle-hud {
+  position: fixed;
+  top: 14px;
+  left: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.hud-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+  padding: 8px 16px;
+  backdrop-filter: blur(8px);
+}
+
+.hud-hi-box {
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
+}
+
+.hud-label {
+  font-family: 'Press Start 2P', monospace, sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #cccccc;
+  text-shadow: none;
+}
+
+.hud-hi-box .hud-label {
+  color: #cccccc;
+  text-shadow: none;
+}
+
+.hud-curr-box .hud-label {
+  color: #cccccc;
+  text-shadow: none;
+}
+
+.hud-val {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  min-width: 65px;
+  text-align: right;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: none;
+}
+
+.hud-hi-box .hud-val {
+  color: #ffffff;
+  text-shadow: none;
+}
+
+.hud-curr-box .hud-val {
+  color: #ffffff;
+  text-shadow: none;
+}
+
+.hud-flash {
+  animation: hudFlashPulse 0.3s ease-in-out 3;
+}
+
+@keyframes hudFlashPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.75; }
+}
+
+/* ── Game Over Actions Row ──────────────────────────────────── */
+.gameover-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  width: 100%;
+}
+
+.gameover-actions .jg-btn {
+  flex: 1;
+  padding: 13px 16px;
+  font-size: 10px;
+}
+
+/* ── Responsive adjustments for mobile / small viewports ────── */
+@media (max-width: 600px) {
+  .jungle-hud {
     top: 10px;
+    left: 10px;
+    gap: 6px;
   }
-}
-
-@media (max-width: 240px) {
-  .interstitial-wrapper {
-    overflow: inherit;
-    padding: 0 8px;
+  .hud-item {
+    padding: 6px 10px;
+    gap: 6px;
   }
-}
-
-.arcade-mode,
-.arcade-mode .runner-container,
-.arcade-mode .runner-canvas {
-  image-rendering: pixelated;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.arcade-mode #buttons,
-.arcade-mode #main-content {
-  opacity: 0;
-  overflow: hidden;
-}
-
-.arcade-mode .interstitial-wrapper {
-  height: 100vh;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.arcade-mode .runner-container {
-  left: 0;
-  margin: auto;
-  right: 0;
-  transform-origin: top center;
-  transition: transform 250ms cubic-bezier(0.4, 0, 1, 1) 400ms;
-  z-index: 2;
+  .hud-label {
+    font-size: 8px;
+  }
+  .hud-val {
+    font-size: 16px;
+    min-width: 45px;
+    letter-spacing: 1px;
+  }
+  .audio-controls {
+    top: 10px;
+    right: 10px;
+    padding: 4px 8px;
+  }
+  .vol-slider {
+    width: 48px;
+  }
 }

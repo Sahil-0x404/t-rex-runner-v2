@@ -311,21 +311,30 @@
          */
         loadSounds: function () {
             if (!IS_IOS) {
-                this.audioContext = new AudioContext();
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-                var resourceTemplate =
-                    document.getElementById(this.config.RESOURCE_TEMPLATE_ID).content;
+                    var resEl = document.getElementById(this.config.RESOURCE_TEMPLATE_ID);
+                    var resourceTemplate = resEl ? resEl.content : null;
 
-                for (var sound in Runner.sounds) {
-                    var soundSrc =
-                        resourceTemplate.getElementById(Runner.sounds[sound]).src;
-                    soundSrc = soundSrc.substr(soundSrc.indexOf(',') + 1);
-                    var buffer = decodeBase64ToArrayBuffer(soundSrc);
-
-                    // Async, so no guarantee of order in array.
-                    this.audioContext.decodeAudioData(buffer, function (index, audioData) {
-                        this.soundFx[index] = audioData;
-                    }.bind(this, sound));
+                    if (resourceTemplate) {
+                        for (var sound in Runner.sounds) {
+                            var soundEl = resourceTemplate.getElementById ?
+                                resourceTemplate.getElementById(Runner.sounds[sound]) :
+                                resourceTemplate.querySelector('#' + Runner.sounds[sound]);
+                            if (soundEl && soundEl.src) {
+                                var soundSrc = soundEl.src.substr(soundEl.src.indexOf(',') + 1);
+                                var buffer = decodeBase64ToArrayBuffer(soundSrc);
+                                if (buffer && buffer.byteLength > 0) {
+                                    this.audioContext.decodeAudioData(buffer, function (index, audioData) {
+                                        this.soundFx[index] = audioData;
+                                    }.bind(this, sound), function () {});
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Procedural Web Audio handles sound safely
                 }
             }
         },
@@ -466,32 +475,11 @@
          */
         playIntro: function () {
             if (!this.activated && !this.crashed) {
-                this.playingIntro = true;
-                this.tRex.playingIntro = true;
-
-                // CSS animation definition.
-                var keyframes = '@-webkit-keyframes intro { ' +
-                    'from { width:' + Trex.config.WIDTH + 'px }' +
-                    'to { width: ' + this.dimensions.WIDTH + 'px }' +
-                    '}';
-                
-                // create a style sheet to put the keyframe rule in 
-                // and then place the style sheet in the html head    
-                var sheet = document.createElement('style');
-                sheet.innerHTML = keyframes;
-                document.head.appendChild(sheet);
-
-                this.containerEl.addEventListener(Runner.events.ANIM_END,
-                    this.startGame.bind(this));
-
-                this.containerEl.style.webkitAnimation = 'intro .4s ease-out 1 both';
-                this.containerEl.style.width = this.dimensions.WIDTH + 'px';
-
-                // if (this.touchController) {
-                //     this.outerContainerEl.appendChild(this.touchController);
-                // }
+                this.playingIntro = false;
+                this.tRex.playingIntro = false;
                 this.playing = true;
                 this.activated = true;
+                this.startGame();
             } else if (this.crashed) {
                 this.restart();
             }
@@ -505,7 +493,12 @@
             this.setArcadeMode();
             this.runningTime = 0;
             this.playingIntro = false;
-            this.tRex.playingIntro = false;
+            this.activated = true;
+            if (this.tRex) {
+                this.tRex.playingIntro = false;
+                this.tRex.status = Trex.status.RUNNING;
+                this.tRex.reset();
+            }
             this.containerEl.style.webkitAnimation = '';
             this.playCount++;
 
@@ -545,8 +538,8 @@
                 this.runningTime += deltaTime;
                 var hasObstacles = this.runningTime > this.config.CLEAR_TIME;
 
-                // First jump triggers the intro.
-                if (this.tRex.jumpCount == 1 && !this.playingIntro) {
+                // First jump triggers the intro (only if not already activated).
+                if (!this.activated && this.tRex.jumpCount == 1 && !this.playingIntro) {
                     this.playIntro();
                 }
 
@@ -672,6 +665,7 @@
          * @param {Event} e
          */
         onKeyDown: function (e) {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
             // Prevent native page scrolling whilst tapping on mobile.
             if (IS_MOBILE && this.playing) {
                 e.preventDefault();
@@ -681,8 +675,9 @@
                 if (!this.crashed && (Runner.keycodes.JUMP[e.keyCode] ||
                     e.type == Runner.events.TOUCHSTART)) {
                     if (!this.playing) {
-                        this.loadSounds();
+                        try { this.loadSounds(); } catch (e) {}
                         this.playing = true;
+                        this.activated = true;
                         this.update();
                         if (window.errorPageController) {
                             errorPageController.trackEasterEgg();
@@ -837,6 +832,7 @@
                 this.distanceMeter.reset(this.highestScore);
                 this.horizon.reset();
                 this.tRex.reset();
+                this.tRex.jumpCount = 0;
                 this.playSound(this.soundFx.BUTTON_PRESS);
                 this.invert(true);
                 this.update();
@@ -848,28 +844,9 @@
          */
         setArcadeMode() {
             document.body.classList.add(Runner.classes.ARCADE_MODE);
-            this.setArcadeModeContainerScale();
         },
 
-        /**
-         * Sets the scaling for arcade mode.
-         */
         setArcadeModeContainerScale() {
-            const windowHeight = window.innerHeight;
-            const scaleHeight = windowHeight / this.dimensions.HEIGHT;
-            const scaleWidth = window.innerWidth / this.dimensions.WIDTH;
-            const scale = Math.max(1, Math.min(scaleHeight, scaleWidth));
-            const scaledCanvasHeight = this.dimensions.HEIGHT * scale;
-            // Positions the game container at 10% of the available vertical window
-            // height minus the game container height.
-            const translateY = Math.ceil(Math.max(0, (windowHeight - scaledCanvasHeight -
-                                                      Runner.config.ARCADE_MODE_INITIAL_TOP_POSITION) *
-                                                  Runner.config.ARCADE_MODE_TOP_POSITION_PERCENT)) *
-                  window.devicePixelRatio;
-
-            const cssScale = scale;
-            this.containerEl.style.transform =
-                'scale(' + cssScale + ') translateY(' + translateY + 'px)';
         },
         
         /**
@@ -1008,15 +985,20 @@
      * @param {string} base64String
      */
     function decodeBase64ToArrayBuffer(base64String) {
-        var len = (base64String.length / 4) * 3;
-        var str = atob(base64String);
-        var arrayBuffer = new ArrayBuffer(len);
-        var bytes = new Uint8Array(arrayBuffer);
+        try {
+            var clean = (base64String || '').replace(/[^A-Za-z0-9+/=]/g, '');
+            var str = atob(clean);
+            var len = str.length;
+            var arrayBuffer = new ArrayBuffer(len);
+            var bytes = new Uint8Array(arrayBuffer);
 
-        for (var i = 0; i < len; i++) {
-            bytes[i] = str.charCodeAt(i);
+            for (var i = 0; i < len; i++) {
+                bytes[i] = str.charCodeAt(i);
+            }
+            return bytes.buffer;
+        } catch (e) {
+            return new ArrayBuffer(0);
         }
-        return bytes.buffer;
     }
 
 
@@ -1501,7 +1483,7 @@
             yPos: [100, 75, 50], // Variable height.
             yPosMobile: [100, 50], // Variable height mobile.
             multipleSpeed: 999,
-            minSpeed: 8.5,
+            minSpeed: 6.0,
             minGap: 150,
             collisionBoxes: [
                 new CollisionBox(15, 15, 16, 5),
@@ -1876,7 +1858,6 @@
             this.update(0, Trex.status.RUNNING);
             this.midair = false;
             this.speedDrop = false;
-            this.jumpCount = 0;
         }
     };
 
@@ -2594,7 +2575,7 @@
             this.nightMode.update(showNightMode);
             this.updateClouds(deltaTime, currentSpeed);
 
-            if (updateObstacles) {
+            if (updateObstacles || (this.obstacles && this.obstacles.length > 0)) {
                 this.updateObstacles(deltaTime, currentSpeed);
             }
         },
@@ -2742,6 +2723,13 @@
                 this.dimensions.WIDTH));
         }
     };
+
+    window['Runner'] = Runner;
+    window['Trex'] = Trex;
+    window['Obstacle'] = Obstacle;
+    window['HorizonLine'] = HorizonLine;
+    window['DistanceMeter'] = DistanceMeter;
+    window['Horizon'] = Horizon;
 })();
 
 
