@@ -509,8 +509,12 @@
     initRain();
   }
 
+  var animFrameId = null;
+  var isRunning = false;
+
   function frame(now) {
-    requestAnimationFrame(frame);
+    if (!isRunning) return;
+    animFrameId = requestAnimationFrame(frame);
     t = now;
 
     var spd = getSpeed();
@@ -536,6 +540,29 @@
     updateAndDrawRain(spd, palette.rain);
   }
 
+  function startAnimation() {
+    if (isRunning) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    isRunning = true;
+    animFrameId = requestAnimationFrame(frame);
+  }
+
+  function stopAnimation() {
+    isRunning = false;
+    if (animFrameId) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
+  }
+
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      stopAnimation();
+    } else {
+      startAnimation();
+    }
+  }
+
   /* ── Bootstrap ──────────────────────────────────────────── */
   function init() {
     bgCanvas = document.createElement('canvas');
@@ -545,10 +572,11 @@
     W = bgCanvas.width = window.innerWidth;
     H = bgCanvas.height = window.innerHeight;
     window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     initFireflies();
     initSpores();
     initRain();
-    requestAnimationFrame(frame);
+    startAnimation();
   }
 
   if (document.readyState === 'loading') {

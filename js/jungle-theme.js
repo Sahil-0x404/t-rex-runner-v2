@@ -191,8 +191,13 @@
   /* ═══════════════════════════════════════════════════════
      3. CLEAN PROTOTYPE OVERRIDES
   ═══════════════════════════════════════════════════════ */
+  var prototypesPatched = false;
   function patchGamePrototypes() {
-    if (!window.Runner) return;
+    if (!window.Runner || prototypesPatched || (Runner.prototype && Runner.prototype._junglePatched)) return;
+    prototypesPatched = true;
+    if (Runner.prototype) {
+      Runner.prototype._junglePatched = true;
+    }
 
     /* ── Bypass legacy webkitAnimationEnd intro lock ── */
     Runner.prototype.playIntro = function () {
@@ -475,6 +480,33 @@
     'Ranger', 'Shadow', 'Scout', 'Claw', 'Chrono', 'Titan'
   ];
 
+  /* Safe storage wrapper with memory fallback for incognito or blocked environments */
+  var memStorage = {};
+  function safeStorageGet(key) {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+    } catch (e) {
+      // Storage access blocked or restricted (e.g. cookies disabled, third-party iframe)
+    }
+    return Object.prototype.hasOwnProperty.call(memStorage, key) ? memStorage[key] : null;
+  }
+
+  function safeStorageSet(key, value) {
+    var strVal = String(value);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, strVal);
+        return true;
+      }
+    } catch (e) {
+      // Storage quota exceeded or disabled
+    }
+    memStorage[key] = strVal;
+    return false;
+  }
+
   function generateRandomPlayerName() {
     var base = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
     var num = Math.floor(Math.random() * 90 + 10);
@@ -482,12 +514,10 @@
   }
 
   function getPlayerName() {
-    try {
-      var saved = localStorage.getItem(PLAYER_NAME_KEY);
-      if (saved && saved.trim().length > 0) {
-        return saved.trim().substring(0, 12);
-      }
-    } catch (e) {}
+    var saved = safeStorageGet(PLAYER_NAME_KEY);
+    if (saved && typeof saved === 'string' && saved.trim().length > 0) {
+      return saved.trim().substring(0, 12);
+    }
 
     // No persistent name yet -> generate a cool random one and remember it!
     var randomName = generateRandomPlayerName();
@@ -496,10 +526,8 @@
   }
 
   function setPlayerName(name) {
-    if (!name || !name.trim()) return;
-    try {
-      localStorage.setItem(PLAYER_NAME_KEY, name.trim().substring(0, 12));
-    } catch (e) {}
+    if (!name || typeof name !== 'string' || !name.trim()) return;
+    safeStorageSet(PLAYER_NAME_KEY, name.trim().substring(0, 12));
   }
 
   window.JunglePlayerName = {
@@ -508,26 +536,74 @@
     generate: generateRandomPlayerName
   };
 
+  function isValidLeaderboardEntry(item) {
+    if (!item || typeof item !== 'object') return false;
+    var score = Number(item.score);
+    return Number.isFinite(score) && score >= 0;
+  }
+
+  function sanitizeLeaderboardEntry(item) {
+    var name = (typeof item.name === 'string' && item.name.trim().length > 0)
+      ? item.name.trim().substring(0, 12)
+      : 'Explorer';
+    var score = Math.max(0, Math.floor(Number(item.score) || 0));
+    var date = (typeof item.date === 'string' && item.date.trim().length > 0)
+      ? item.date.trim().substring(0, 20)
+      : new Date().toLocaleDateString();
+    return {
+      name: name,
+      score: score,
+      date: date
+    };
+  }
+
   var Leaderboard = {
     load: function () {
-      try { return JSON.parse(localStorage.getItem(LB_KEY)) || []; }
-      catch (e) { return []; }
+      var raw = safeStorageGet(LB_KEY);
+      if (!raw) return [];
+      try {
+        var parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        var clean = [];
+        for (var i = 0; i < parsed.length; i++) {
+          if (isValidLeaderboardEntry(parsed[i])) {
+            clean.push(sanitizeLeaderboardEntry(parsed[i]));
+          }
+        }
+        clean.sort(function (a, b) { return b.score - a.score; });
+        return clean.slice(0, 5);
+      } catch (e) {
+        return [];
+      }
     },
     save: function (entries) {
-      try { localStorage.setItem(LB_KEY, JSON.stringify(entries)); } catch (e) {}
+      if (!Array.isArray(entries)) return;
+      var clean = [];
+      for (var i = 0; i < entries.length; i++) {
+        if (isValidLeaderboardEntry(entries[i])) {
+          clean.push(sanitizeLeaderboardEntry(entries[i]));
+        }
+      }
+      clean.sort(function (a, b) { return b.score - a.score; });
+      safeStorageSet(LB_KEY, JSON.stringify(clean.slice(0, 5)));
     },
     isTopFive: function (score) {
-      if (score <= 0) return false;
+      var numScore = Math.max(0, Math.floor(Number(score) || 0));
+      if (numScore <= 0) return false;
       var e = this.load();
-      return e.length < 5 || score > e[e.length - 1].score;
+      return e.length < 5 || numScore > e[e.length - 1].score;
     },
     add: function (name, score) {
+      var numScore = Math.max(0, Math.floor(Number(score) || 0));
+      if (numScore <= 0) return this.load();
       var e = this.load();
-      var playerName = (name && name.trim().length > 0) ? name.trim().substring(0, 12) : getPlayerName();
+      var playerName = (typeof name === 'string' && name.trim().length > 0)
+        ? name.trim().substring(0, 12)
+        : getPlayerName();
       setPlayerName(playerName);
       e.push({
         name: playerName,
-        score: score,
+        score: numScore,
         date: new Date().toLocaleDateString()
       });
       e.sort(function (a, b) { return b.score - a.score; });
@@ -540,16 +616,50 @@
       if (!tb) return;
       var e = this.load();
       var medals = ['🥇', '🥈', '🥉', '④', '⑤'];
-      tb.innerHTML = e.length === 0
-        ? '<tr><td colspan="4" style="text-align:center;opacity:0.5;padding:12px">No scores yet — be the first!</td></tr>'
-        : e.map(function (r, i) {
-            return '<tr class="lb-row">' +
-              '<td>' + medals[i] + '</td>' +
-              '<td>' + r.name + '</td>' +
-              '<td class="lb-score">' + r.score + '</td>' +
-              '<td class="lb-date">' + r.date + '</td>' +
-            '</tr>';
-          }).join('');
+
+      // Empty existing rows cleanly and safely
+      while (tb.firstChild) {
+        tb.removeChild(tb.firstChild);
+      }
+
+      if (e.length === 0) {
+        var emptyTr = document.createElement('tr');
+        var emptyTd = document.createElement('td');
+        emptyTd.colSpan = 4;
+        emptyTd.style.textAlign = 'center';
+        emptyTd.style.opacity = '0.5';
+        emptyTd.style.padding = '12px';
+        emptyTd.textContent = 'No scores yet — be the first!';
+        emptyTr.appendChild(emptyTd);
+        tb.appendChild(emptyTr);
+        return;
+      }
+
+      for (var i = 0; i < e.length; i++) {
+        var r = e[i];
+        var tr = document.createElement('tr');
+        tr.className = 'lb-row';
+
+        var tdMedal = document.createElement('td');
+        tdMedal.textContent = medals[i] || String(i + 1);
+        tr.appendChild(tdMedal);
+
+        var tdName = document.createElement('td');
+        tdName.textContent = r.name || 'Explorer';
+        tr.appendChild(tdName);
+
+        var tdScore = document.createElement('td');
+        tdScore.className = 'lb-score';
+        tdScore.textContent = String(r.score);
+        tr.appendChild(tdScore);
+
+        var tdDate = document.createElement('td');
+        tdDate.className = 'lb-date';
+        tdDate.textContent = r.date || '';
+        tr.appendChild(tdDate);
+
+        tb.appendChild(tr);
+      }
     }
   };
   window.JungleLeaderboard = Leaderboard;
