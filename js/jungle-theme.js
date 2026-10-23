@@ -401,6 +401,18 @@
     var origGameOver = Runner.prototype.gameOver;
     Runner.prototype.gameOver = function () {
       origGameOver.call(this);
+
+      // Visceral 150ms screen jitter on impact
+      var container = document.getElementById('main-frame-error') || document.body;
+      if (container) {
+        container.classList.remove('camera-shake');
+        void container.offsetWidth; // force reflow
+        container.classList.add('camera-shake');
+        setTimeout(function () {
+          container.classList.remove('camera-shake');
+        }, 160);
+      }
+
       var score = this.distanceMeter
         ? this.distanceMeter.getActualDistance(Math.ceil(this.distanceRan))
         : Math.ceil(this.distanceRan);
@@ -623,6 +635,8 @@
       if (r.containerEl) {
         r.containerEl.classList.remove(Runner.classes.CRASHED);
       }
+      var mainWrapper = document.getElementById('main-frame-error') || document.body;
+      if (mainWrapper) mainWrapper.classList.remove('camera-shake');
 
       // Reset obstacles and horizon
       if (r.horizon) {
