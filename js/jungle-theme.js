@@ -425,9 +425,49 @@
   }
 
   /* ═══════════════════════════════════════════════════════
-     4. LEADERBOARD & HUD SCORE MANAGEMENT
+     4. PLAYER IDENTITY & LEADERBOARD MANAGEMENT
   ═══════════════════════════════════════════════════════ */
   var LB_KEY = 'jungleRunnerLeaderboard_v1';
+  var PLAYER_NAME_KEY = 'jungleRunnerPlayerName_v1';
+
+  var RANDOM_NAMES = [
+    'Rex', 'Raptor', 'Dino', 'Hunter', 'Amber', 'Fern',
+    'Apex', 'Viper', 'Moss', 'Fang', 'Cycad', 'Tracker',
+    'Ranger', 'Shadow', 'Scout', 'Claw', 'Chrono', 'Titan'
+  ];
+
+  function generateRandomPlayerName() {
+    var base = RANDOM_NAMES[Math.floor(Math.random() * RANDOM_NAMES.length)];
+    var num = Math.floor(Math.random() * 90 + 10);
+    return base + '_' + num;
+  }
+
+  function getPlayerName() {
+    try {
+      var saved = localStorage.getItem(PLAYER_NAME_KEY);
+      if (saved && saved.trim().length > 0) {
+        return saved.trim().substring(0, 12);
+      }
+    } catch (e) {}
+
+    // No persistent name yet -> generate a cool random one and remember it!
+    var randomName = generateRandomPlayerName();
+    setPlayerName(randomName);
+    return randomName;
+  }
+
+  function setPlayerName(name) {
+    if (!name || !name.trim()) return;
+    try {
+      localStorage.setItem(PLAYER_NAME_KEY, name.trim().substring(0, 12));
+    } catch (e) {}
+  }
+
+  window.JunglePlayerName = {
+    get: getPlayerName,
+    set: setPlayerName,
+    generate: generateRandomPlayerName
+  };
 
   var Leaderboard = {
     load: function () {
@@ -444,8 +484,10 @@
     },
     add: function (name, score) {
       var e = this.load();
+      var playerName = (name && name.trim().length > 0) ? name.trim().substring(0, 12) : getPlayerName();
+      setPlayerName(playerName);
       e.push({
-        name: (name || 'Explorer').trim().substring(0, 12),
+        name: playerName,
         score: score,
         date: new Date().toLocaleDateString()
       });
@@ -539,14 +581,21 @@
 
     if (Leaderboard.isTopFive(score)) {
       if (nhSection) nhSection.classList.remove('hidden');
+
+      var defaultName = getPlayerName();
       if (nameInput) {
-        nameInput.value = '';
-        setTimeout(function () { nameInput.focus(); }, 50);
+        nameInput.value = defaultName;
+        setTimeout(function () {
+          nameInput.focus();
+          nameInput.select();
+        }, 50);
       }
       if (saveBtn) {
         saveBtn.onclick = function () {
-          var name = (nameInput ? nameInput.value : '') || 'Explorer';
-          Leaderboard.add(name, score);
+          var inputVal = nameInput ? nameInput.value.trim() : '';
+          var finalName = inputVal || defaultName || getPlayerName();
+          setPlayerName(finalName);
+          Leaderboard.add(finalName, score);
           Leaderboard.render('jg-lb-body');
           if (nhSection) nhSection.classList.add('hidden');
           updateHUD(score);
