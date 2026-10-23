@@ -666,6 +666,14 @@
          */
         onKeyDown: function (e) {
             if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+            // Prevent any key triggers when menus / overlays are visible
+            var startMenu = document.getElementById('jungle-start-menu');
+            var goMenu = document.getElementById('jungle-gameover');
+            var overlayActive = (startMenu && !startMenu.classList.contains('hidden')) ||
+                                (goMenu && !goMenu.classList.contains('hidden'));
+            if (overlayActive) {
+                return;
+            }
             // Prevent native page scrolling whilst tapping on mobile.
             if (IS_MOBILE && this.playing) {
                 e.preventDefault();
@@ -714,6 +722,15 @@
          * @param {Event} e
          */
         onKeyUp: function (e) {
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+            var startMenu = document.getElementById('jungle-start-menu');
+            var goMenu = document.getElementById('jungle-gameover');
+            var overlayActive = (startMenu && !startMenu.classList.contains('hidden')) ||
+                                (goMenu && !goMenu.classList.contains('hidden'));
+            if (overlayActive) {
+                return;
+            }
+
             var keyCode = String(e.keyCode);
             var isjumpKey = Runner.keycodes.JUMP[keyCode] ||
                 e.type == Runner.events.TOUCHEND ||
@@ -725,7 +742,10 @@
                 this.tRex.speedDrop = false;
                 this.tRex.setDuck(false);
             } else if (this.crashed) {
-                // Check that enough time has elapsed before allowing jump key to restart.
+                // When custom game-over overlay exists, restarts must be initiated via PLAY AGAIN button
+                if (goMenu) {
+                    return;
+                }
                 var deltaTime = getTimeStamp() - this.time;
 
                 if (Runner.keycodes.RESTART[keyCode] || this.isLeftClickOnCanvas(e) ||

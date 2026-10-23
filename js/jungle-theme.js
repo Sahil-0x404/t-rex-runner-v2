@@ -364,17 +364,56 @@
       if (origPlaySound) origPlaySound.call(this, soundBuffer);
     };
 
-    /* Duck sound hook */
+    function isAnyOverlayOpen() {
+      var startMenu = document.getElementById('jungle-start-menu');
+      var goMenu = document.getElementById('jungle-gameover');
+      var startVis = startMenu && !startMenu.classList.contains('hidden');
+      var goVis = goMenu && !goMenu.classList.contains('hidden');
+      return !!(startVis || goVis);
+    }
+
+    /* Suppress all native runner events when menus or dialogs are active */
+    var origHandleEvent = Runner.prototype.handleEvent;
+    if (origHandleEvent) {
+      Runner.prototype.handleEvent = function (e) {
+        if (isAnyOverlayOpen()) {
+          return;
+        }
+        origHandleEvent.call(this, e);
+      };
+    }
+
     var origKeyDown = Runner.prototype.onKeyDown;
     if (origKeyDown) {
       Runner.prototype.onKeyDown = function (e) {
+        if (isAnyOverlayOpen()) {
+          return;
+        }
         if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        if (!this.playing || this.crashed) {
+          return;
+        }
         if ((e.keyCode === 40 || e.keyCode === 18) && this.playing && !this.crashed) {
           if (this.tRex && !this.tRex.ducking) {
             JungleAudio.duck();
           }
         }
         origKeyDown.call(this, e);
+      };
+    }
+
+    var origKeyUp = Runner.prototype.onKeyUp;
+    if (origKeyUp) {
+      Runner.prototype.onKeyUp = function (e) {
+        if (isAnyOverlayOpen()) {
+          return;
+        }
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        if (this.crashed) {
+          // Never restart via keyup when crashed — restarts are exclusively via PLAY AGAIN button
+          return;
+        }
+        origKeyUp.call(this, e);
       };
     }
 
@@ -770,16 +809,9 @@
       });
     }
 
-    // Space / Up key dismissal of start menu
+    // Global keyboard handlers for Escape and Mute
     document.addEventListener('keydown', function (e) {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-
-      var startMenu = document.getElementById('jungle-start-menu');
-      if ((e.keyCode === 32 || e.keyCode === 38) && startMenu && !startMenu.classList.contains('hidden')) {
-        e.preventDefault();
-        startGameplay();
-        return;
-      }
 
       // Escape key returns to main menu from gameover / leaderboard
       if (e.keyCode === 27) {
@@ -796,14 +828,6 @@
         if (muteBtn) muteBtn.click();
       }
     });
-
-    // Touch dismissal
-    document.addEventListener('touchstart', function () {
-      var startMenu = document.getElementById('jungle-start-menu');
-      if (startMenu && !startMenu.classList.contains('hidden')) {
-        startGameplay();
-      }
-    }, { passive: true });
 
     // Audio controls
     var muteBtn = document.getElementById('jungle-mute-btn');
