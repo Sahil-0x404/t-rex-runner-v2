@@ -557,8 +557,59 @@
     };
   }
 
+  /* ═══════════════════════════════════════════════════════
+     FIREBASE REALTIME GLOBAL LEADERBOARD INTEGRATION
+  ═══════════════════════════════════════════════════════ */
+  var firebaseConfig = {
+    apiKey: "AIzaSyCydzqMI7mc9iSib2glWdx9iAUC4eBIb6w",
+    authDomain: "the-trex-runner.firebaseapp.com",
+    databaseURL: "https://the-trex-runner-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "the-trex-runner",
+    storageBucket: "the-trex-runner.firebasestorage.app",
+    messagingSenderId: "599755321174",
+    appId: "1:599755321174:web:4f94b88a9bc08e8a26b0f7",
+    measurementId: "G-LK5K7NG0G4"
+  };
+
+  var firebaseDb = null;
+  var cloudLeaderboardCache = null;
+
+  function initFirebaseLeaderboard() {
+    try {
+      if (typeof window !== 'undefined' && window.firebase) {
+        if (!firebase.apps || !firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        firebaseDb = firebase.database();
+        // Subscribe to real-time changes across all devices worldwide
+        firebaseDb.ref('leaderboard').on('value', function (snapshot) {
+          var val = snapshot.val();
+          if (val) {
+            var list = [];
+            for (var key in val) {
+              if (Object.prototype.hasOwnProperty.call(val, key)) {
+                var item = val[key];
+                if (isValidLeaderboardEntry(item)) {
+                  list.push(sanitizeLeaderboardEntry(item));
+                }
+              }
+            }
+            list.sort(function (a, b) { return b.score - a.score; });
+            cloudLeaderboardCache = list.slice(0, 5);
+            Leaderboard.saveLocal(cloudLeaderboardCache);
+            Leaderboard.render('jg-lb-body');
+          }
+        }, function (err) {
+          console.warn('Firebase realtime sync note:', err);
+        });
+      }
+    } catch (e) {
+      console.warn('Firebase init note:', e);
+    }
+  }
+
   var Leaderboard = {
-    load: function () {
+    loadLocal: function () {
       var raw = safeStorageGet(LB_KEY);
       if (!raw) return [];
       try {
@@ -576,7 +627,7 @@
         return [];
       }
     },
-    save: function (entries) {
+    saveLocal: function (entries) {
       if (!Array.isArray(entries)) return;
       var clean = [];
       for (var i = 0; i < entries.length; i++) {
@@ -586,6 +637,15 @@
       }
       clean.sort(function (a, b) { return b.score - a.score; });
       safeStorageSet(LB_KEY, JSON.stringify(clean.slice(0, 5)));
+    },
+    load: function () {
+      if (cloudLeaderboardCache && cloudLeaderboardCache.length > 0) {
+        return cloudLeaderboardCache;
+      }
+      return this.loadLocal();
+    },
+    save: function (entries) {
+      this.saveLocal(entries);
     },
     isTopFive: function (score) {
       var numScore = Math.max(0, Math.floor(Number(score) || 0));
@@ -601,14 +661,28 @@
         ? name.trim().substring(0, 12)
         : getPlayerName();
       setPlayerName(playerName);
-      e.push({
+
+      var newEntry = {
         name: playerName,
         score: numScore,
         date: new Date().toLocaleDateString()
-      });
+      };
+
+      // 1. Broadcast to Firebase Realtime Database for all devices to receive live
+      if (firebaseDb) {
+        try {
+          firebaseDb.ref('leaderboard').push(newEntry);
+        } catch (err) {
+          console.warn('Firebase push failed:', err);
+        }
+      }
+
+      // 2. Also update local cache for instant zero-latency UI
+      e.push(newEntry);
       e.sort(function (a, b) { return b.score - a.score; });
       if (e.length > 5) e = e.slice(0, 5);
-      this.save(e);
+      cloudLeaderboardCache = e;
+      this.saveLocal(e);
       return e;
     },
     render: function (tbodyId) {
@@ -966,6 +1040,7 @@
 
   function init() {
     patchGamePrototypes();
+    initFirebaseLeaderboard();
     setupControls();
     updateHUD(0);
 
