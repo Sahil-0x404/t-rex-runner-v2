@@ -473,6 +473,20 @@
   ═══════════════════════════════════════════════════════ */
   var LB_KEY = 'jungleRunnerLeaderboard_v1';
   var PLAYER_NAME_KEY = 'jungleRunnerPlayerName_v1';
+  var PLAYER_ID_KEY = 'jungleRunnerPlayerId_v2';
+
+  function getPlayerId() {
+    var id = safeStorageGet(PLAYER_ID_KEY);
+    if (!id || typeof id !== 'string' || id.trim().length === 0) {
+      id = 'pid_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      safeStorageSet(PLAYER_ID_KEY, id);
+    }
+    return id;
+  }
+
+  function nameToKey(name) {
+    return (name || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').substring(0, 16);
+  }
 
   var RANDOM_NAMES = [
     'Rex', 'Raptor', 'Dino', 'Hunter', 'Amber', 'Fern',
@@ -573,6 +587,7 @@
 
   var firebaseDb = null;
   var cloudLeaderboardCache = null;
+  var cloudAllPlayers = {};
 
   function initFirebaseLeaderboard() {
     try {
@@ -584,21 +599,32 @@
         // Subscribe to real-time changes across all devices worldwide
         firebaseDb.ref('leaderboard').on('value', function (snapshot) {
           var val = snapshot.val();
+          cloudAllPlayers = {};
           if (val) {
-            var list = [];
             for (var key in val) {
               if (Object.prototype.hasOwnProperty.call(val, key)) {
                 var item = val[key];
                 if (isValidLeaderboardEntry(item)) {
-                  list.push(sanitizeLeaderboardEntry(item));
+                  var clean = sanitizeLeaderboardEntry(item);
+                  clean.key = key;
+                  clean.playerId = item.playerId || '';
+                  var nKey = nameToKey(clean.name);
+                  // Deduplicate: If same player has multiple entries, keep only their personal best!
+                  if (!cloudAllPlayers[nKey] || clean.score > cloudAllPlayers[nKey].score) {
+                    cloudAllPlayers[nKey] = clean;
+                  }
                 }
               }
             }
-            list.sort(function (a, b) { return b.score - a.score; });
-            cloudLeaderboardCache = list.slice(0, 5);
-            Leaderboard.saveLocal(cloudLeaderboardCache);
-            Leaderboard.render('jg-lb-body');
           }
+          var uniqueList = [];
+          for (var k in cloudAllPlayers) {
+            uniqueList.push(cloudAllPlayers[k]);
+          }
+          uniqueList.sort(function (a, b) { return b.score - a.score; });
+          cloudLeaderboardCache = uniqueList.slice(0, 5);
+          Leaderboard.saveLocal(cloudLeaderboardCache);
+          Leaderboard.render('jg-lb-body');
         }, function (err) {
           console.warn('Firebase realtime sync note:', err);
         });
@@ -615,11 +641,19 @@
       try {
         var parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
-        var clean = [];
+        var byName = {};
         for (var i = 0; i < parsed.length; i++) {
           if (isValidLeaderboardEntry(parsed[i])) {
-            clean.push(sanitizeLeaderboardEntry(parsed[i]));
+            var item = sanitizeLeaderboardEntry(parsed[i]);
+            var nKey = nameToKey(item.name);
+            if (!byName[nKey] || item.score > byName[nKey].score) {
+              byName[nKey] = item;
+            }
           }
+        }
+        var clean = [];
+        for (var k in byName) {
+          clean.push(byName[k]);
         }
         clean.sort(function (a, b) { return b.score - a.score; });
         return clean.slice(0, 5);
@@ -651,39 +685,63 @@
       var numScore = Math.max(0, Math.floor(Number(score) || 0));
       if (numScore <= 0) return false;
       var e = this.load();
-      return e.length < 5 || numScore > e[e.length - 1].score;
+      if (e.length < 5) return true;
+      var myKey = nameToKey(getPlayerName());
+      for (var i = 0; i < e.length; i++) {
+        if (nameToKey(e[i].name) === myKey) {
+          return numScore > e[i].score;
+        }
+      }
+      return numScore > e[e.length - 1].score;
     },
     add: function (name, score) {
       var numScore = Math.max(0, Math.floor(Number(score) || 0));
       if (numScore <= 0) return this.load();
-      var e = this.load();
       var playerName = (typeof name === 'string' && name.trim().length > 0)
         ? name.trim().substring(0, 12)
         : getPlayerName();
       setPlayerName(playerName);
 
-      var newEntry = {
+      var nKey = nameToKey(playerName);
+      var myPid = getPlayerId();
+      var today = new Date().toLocaleDateString();
+
+      // Check existing player record
+      var existing = cloudAllPlayers[nKey];
+      var newBest = numScore;
+      if (existing) {
+        // Keep personal best: never downgrade
+        newBest = Math.max(numScore, existing.score);
+      }
+
+      var entry = {
         name: playerName,
-        score: numScore,
-        date: new Date().toLocaleDateString()
+        score: newBest,
+        date: today,
+        playerId: myPid
       };
 
-      // 1. Broadcast to Firebase Realtime Database for all devices to receive live
+      // 1. Broadcast update to Firebase Realtime Database
       if (firebaseDb) {
         try {
-          firebaseDb.ref('leaderboard').push(newEntry);
+          var targetPath = (existing && existing.key) ? existing.key : nKey;
+          firebaseDb.ref('leaderboard/' + targetPath).set(entry);
         } catch (err) {
-          console.warn('Firebase push failed:', err);
+          console.warn('Firebase set failed:', err);
         }
       }
 
-      // 2. Also update local cache for instant zero-latency UI
-      e.push(newEntry);
-      e.sort(function (a, b) { return b.score - a.score; });
-      if (e.length > 5) e = e.slice(0, 5);
-      cloudLeaderboardCache = e;
-      this.saveLocal(e);
-      return e;
+      // 2. Update local in-memory player map
+      cloudAllPlayers[nKey] = entry;
+
+      var uniqueList = [];
+      for (var k in cloudAllPlayers) {
+        uniqueList.push(cloudAllPlayers[k]);
+      }
+      uniqueList.sort(function (a, b) { return b.score - a.score; });
+      cloudLeaderboardCache = uniqueList.slice(0, 5);
+      this.saveLocal(cloudLeaderboardCache);
+      return cloudLeaderboardCache;
     },
     render: function (tbodyId) {
       var tb = document.getElementById(tbodyId);
@@ -805,6 +863,12 @@
     if (Leaderboard.isTopFive(score)) {
       if (nhSection) nhSection.classList.remove('hidden');
 
+      var nameErrEl = document.getElementById('jg-name-error');
+      if (nameErrEl) {
+        nameErrEl.classList.add('hidden');
+        nameErrEl.textContent = '';
+      }
+
       var defaultName = getPlayerName();
       if (nameInput) {
         nameInput.value = defaultName;
@@ -817,6 +881,29 @@
         saveBtn.onclick = function () {
           var inputVal = nameInput ? nameInput.value.trim() : '';
           var finalName = inputVal || defaultName || getPlayerName();
+          var nKey = nameToKey(finalName);
+          var myPid = getPlayerId();
+
+          // Check if this name is already claimed by another explorer on another device
+          var existing = cloudAllPlayers[nKey];
+          if (existing && existing.playerId && existing.playerId !== myPid) {
+            // Blocked: Name belongs to someone else
+            if (nameErrEl) {
+              nameErrEl.textContent = '⚠️ "' + finalName + '" is already claimed by another player! Please pick another name.';
+              nameErrEl.classList.remove('hidden');
+            }
+            if (nameInput) {
+              nameInput.focus();
+              nameInput.select();
+            }
+            return;
+          }
+
+          if (nameErrEl) {
+            nameErrEl.classList.add('hidden');
+            nameErrEl.textContent = '';
+          }
+
           setPlayerName(finalName);
           Leaderboard.add(finalName, score);
           Leaderboard.render('jg-lb-body');
@@ -825,6 +912,13 @@
         };
       }
       if (nameInput) {
+        nameInput.oninput = function () {
+          var nameErrEl = document.getElementById('jg-name-error');
+          if (nameErrEl) {
+            nameErrEl.classList.add('hidden');
+            nameErrEl.textContent = '';
+          }
+        };
         nameInput.onkeydown = function (e) {
           if (e.keyCode === 13) { // Enter key saves score
             e.preventDefault();
