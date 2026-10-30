@@ -1162,6 +1162,12 @@
     }, 50);
   }
 
+  window.JungleTheme = {
+    getDinoFrame: getDinoFrame,
+    frames: frames,
+    Leaderboard: Leaderboard
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

@@ -511,3 +511,352 @@ html, body {
 .camera-shake {
   animation: cameraJitter 0.15s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
 }
+
+
+/* ════════════════════════════════════════════════════════════
+   AI GESTURE CONTROL HUD & CONTROLS
+   ════════════════════════════════════════════════════════════ */
+.ai-hud {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 240px;
+  background: rgba(3, 8, 20, 0.88);
+  border: 2px solid #00ffcc;
+  border-radius: 14px;
+  box-shadow: 0 0 25px rgba(0, 255, 204, 0.35), inset 0 0 15px rgba(0, 255, 204, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.ai-hud.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px) scale(0.92);
+}
+
+.ai-hud-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 255, 204, 0.12);
+  border-bottom: 1px solid rgba(0, 255, 204, 0.3);
+}
+
+.ai-hud-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  color: #00ffcc;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.8);
+}
+
+#ai-hud-fps {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: #39ff14;
+}
+
+.ai-canvas-wrap {
+  position: relative;
+  width: 240px;
+  height: 180px;
+  background: #000;
+}
+
+#ai-skeleton-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ai-badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  text-align: center;
+  padding: 8px 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+  transition: all 0.2s ease;
+}
+
+.ai-hud-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: #8faec9;
+}
+
+.ai-hud-instructions b {
+  color: #00ffcc;
+}
+
+.jg-btn-ai {
+  background: linear-gradient(135deg, #ff007f, #7928ca) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.4) !important;
+  font-size: 10px !important;
+  padding: 10px 16px !important;
+  width: 100%;
+  letter-spacing: 1px;
+  transition: all 0.25s ease;
+}
+
+.jg-btn-ai:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(255, 0, 127, 0.7) !important;
+}
+
+.jg-btn-ai.active {
+  background: linear-gradient(135deg, #00b09b, #96c93d) !important;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.6) !important;
+}
+
+
+/* ── Ghost Racer UI Button ──────────────────────────────────── */
+.jg-btn-ghost {
+  background: linear-gradient(135deg, #7928ca, #d946ef) !important;
+  color: #fff !important;
+  border: 1px solid rgba(217, 70, 239, 0.4) !important;
+  box-shadow: 0 0 15px rgba(217, 70, 239, 0.4) !important;
+  font-size: 10px !important;
+  padding: 10px 16px !important;
+  width: 100%;
+  letter-spacing: 1px;
+  transition: all 0.25s ease;
+}
+
+.jg-btn-ghost:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(217, 70, 239, 0.7) !important;
+}
+
+.jg-btn-ghost.active {
+  background: linear-gradient(135deg, #a855f7, #ec4899) !important;
+  box-shadow: 0 0 20px rgba(236, 72, 153, 0.6) !important;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   RIVAL CHALLENGER HUD BOX (Top Center)
+   ════════════════════════════════════════════════════════════ */
+.rival-hud {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 290px;
+  background: rgba(10, 4, 25, 0.88);
+  border: 1.5px solid #d946ef;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(217, 70, 239, 0.35), inset 0 0 10px rgba(217, 70, 239, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 12px 8px 12px;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.rival-hud.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px) scale(0.95);
+  pointer-events: none;
+}
+
+.rival-hud.defeated-mode {
+  border-color: #00ffcc;
+  box-shadow: 0 0 25px rgba(0, 255, 204, 0.6), inset 0 0 12px rgba(0, 255, 204, 0.2);
+}
+
+.rival-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(217, 70, 239, 0.25);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.rival-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rival-crown {
+  font-size: 11px;
+}
+
+.rival-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8.5px;
+  color: #f5d0fe;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(217, 70, 239, 0.8);
+}
+
+.rival-score-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.rival-label {
+  font-size: 10px;
+  color: #a855f7;
+}
+
+.rival-target-val {
+  font-size: 13px;
+  font-weight: bold;
+  color: #ff007f;
+  text-shadow: 0 0 6px rgba(255, 0, 127, 0.7);
+}
+
+.rival-track-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rival-stage {
+  position: relative;
+  width: 56px;
+  height: 42px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(217, 70, 239, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#rival-dino-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.rival-ko-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg) scale(0.6);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: #ff0055;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1.5px solid #ff0055;
+  padding: 3px 6px;
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.8);
+  white-space: nowrap;
+  opacity: 0;
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.rival-ko-stamp.stamp-active {
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(-12deg) scale(1);
+}
+
+.rival-progress-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rival-progress-bar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.rival-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7928ca, #d946ef, #00ffcc);
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+  transition: width 0.15s ease-out;
+}
+
+.rival-player-marker {
+  position: absolute;
+  top: -7px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  transition: left 0.15s ease-out;
+  filter: drop-shadow(0 0 5px #00ffcc);
+}
+
+.rival-gap-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+}
+
+.rival-gap-val {
+  color: #f5d0fe;
+  font-weight: bold;
+}
+
+.rival-status-msg {
+  color: #a855f7;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+
+.rival-toast {
+  position: fixed;
+  top: 75px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  background: rgba(25, 5, 45, 0.9);
+  border: 1px solid #d946ef;
+  border-radius: 20px;
+  color: #f5d0fe;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 0 15px rgba(217, 70, 239, 0.5);
+  z-index: 999;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .rival-hud {
+    width: 250px;
+    padding: 4px 8px 6px 8px;
+  }
+  .rival-name {
+    font-size: 7.5px;
+  }
+  .rival-target-val {
+    font-size: 11px;
+  }
+}
