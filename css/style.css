@@ -547,6 +547,7 @@ html, body {
   padding: 8px 12px;
   background: rgba(0, 255, 204, 0.12);
   border-bottom: 1px solid rgba(0, 255, 204, 0.3);
+  user-select: none;
 }
 
 .ai-hud-title {
@@ -557,10 +558,55 @@ html, body {
   text-shadow: 0 0 8px rgba(0, 255, 204, 0.8);
 }
 
+.ai-hud-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 #ai-hud-fps {
   font-family: 'Share Tech Mono', monospace;
   font-size: 11px;
   color: #39ff14;
+}
+
+.ai-hud-icon-btn {
+  background: rgba(0, 255, 204, 0.15);
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  color: #00ffcc;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.ai-hud-icon-btn:hover {
+  background: rgba(0, 255, 204, 0.35);
+  box-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+  transform: scale(1.08);
+}
+
+.ai-hud.minimized .ai-canvas-wrap {
+  display: none !important;
+}
+
+.ai-hud.minimized .ai-hud-instructions {
+  display: none !important;
+}
+
+.ai-hud.minimized {
+  width: auto;
+  min-width: 130px;
 }
 
 .ai-canvas-wrap {
@@ -858,5 +904,87 @@ html, body {
   }
   .rival-target-val {
     font-size: 11px;
+  }
+
+  /* Compact Non-Intrusive HUD on Mobile Viewports */
+  .ai-hud {
+    bottom: 10px;
+    right: 10px;
+    width: 118px;
+    border-radius: 10px;
+    border-width: 1.5px;
+    box-shadow: 0 0 12px rgba(0, 255, 204, 0.25);
+  }
+
+  .ai-hud-header {
+    padding: 4px 6px;
+    cursor: pointer;
+  }
+
+  .ai-hud-title {
+    font-size: 7px;
+    letter-spacing: 0;
+  }
+
+  #ai-hud-fps {
+    font-size: 8.5px;
+  }
+
+  .ai-hud-controls {
+    gap: 4px;
+  }
+
+  .ai-hud-icon-btn {
+    width: 16px;
+    height: 16px;
+    font-size: 11px;
+  }
+
+  .ai-canvas-wrap {
+    width: 118px;
+    height: 88px;
+  }
+
+  .ai-badge {
+    font-size: 8.5px;
+    padding: 4px 2px;
+    line-height: 1.2;
+  }
+
+  .ai-hud-instructions {
+    display: none !important; /* Conceal long instructions to save 60px height on mobile */
+  }
+
+  .ai-hud.minimized {
+    width: 118px;
+    min-width: unset;
+  }
+
+  .jg-btn-ai {
+    font-size: 8.5px !important;
+    padding: 8px 12px !important;
+  }
+}
+
+/* Landscape orientation on mobile devices */
+@media (max-height: 520px) {
+  .ai-hud {
+    bottom: 6px;
+    right: 6px;
+    width: 105px;
+  }
+
+  .ai-canvas-wrap {
+    width: 105px;
+    height: 75px;
+  }
+
+  .ai-badge {
+    font-size: 8px;
+    padding: 3px 2px;
+  }
+
+  .ai-hud-instructions {
+    display: none !important;
   }
 }

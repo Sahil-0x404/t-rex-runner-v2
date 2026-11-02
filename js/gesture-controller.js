@@ -111,63 +111,96 @@
         }
     }
 
+    // Exponential Moving Average (EMA) coordinate smoothing for landmark stability
+    var smoothedLandmarks = null;
+    var SMOOTH_ALPHA = 0.65; // High responsiveness (0.65 current) + anti-tremor stability (0.35 history)
+
+    function smoothLandmarks(rawLandmarks) {
+        if (!rawLandmarks || rawLandmarks.length !== 21) {
+            smoothedLandmarks = null;
+            return rawLandmarks;
+        }
+        if (!smoothedLandmarks || smoothedLandmarks.length !== 21) {
+            smoothedLandmarks = rawLandmarks.map(function (pt) {
+                return { x: pt.x, y: pt.y, z: pt.z };
+            });
+            return smoothedLandmarks;
+        }
+
+        for (var i = 0; i < 21; i++) {
+            smoothedLandmarks[i].x = SMOOTH_ALPHA * rawLandmarks[i].x + (1 - SMOOTH_ALPHA) * smoothedLandmarks[i].x;
+            smoothedLandmarks[i].y = SMOOTH_ALPHA * rawLandmarks[i].y + (1 - SMOOTH_ALPHA) * smoothedLandmarks[i].y;
+            smoothedLandmarks[i].z = SMOOTH_ALPHA * rawLandmarks[i].z + (1 - SMOOTH_ALPHA) * smoothedLandmarks[i].z;
+        }
+        return smoothedLandmarks;
+    }
+
     /**
-     * Measure 3D Euclidean distance from wrist (0) to fingertip vs wrist to PIP joint
-     * Robust against camera distance, hand size, and tilt angle.
+     * Measure Euclidean distance from wrist (0) to fingertip vs wrist to PIP joint,
+     * and verify tip distance relative to MCP knuckle joint.
+     * Robust against camera distance, hand size, tilt angle, and sensor noise.
      */
-    function isFingerExtended(landmarks, tipIdx, pipIdx) {
+    function isFingerExtended(landmarks, tipIdx, pipIdx, mcpIdx) {
         var wrist = landmarks[0];
         var tip = landmarks[tipIdx];
         var pip = landmarks[pipIdx];
+        var mcp = landmarks[mcpIdx];
 
-        var dTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
-        var dPip = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
+        var dTipWrist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+        var dPipWrist = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
+        var dTipMcp = Math.hypot(tip.x - mcp.x, tip.y - mcp.y);
+        var dPipMcp = Math.hypot(pip.x - mcp.x, pip.y - mcp.y);
 
-        return dTip > (dPip * 1.12);
+        // Tip must be noticeably farther from wrist than PIP (>= 1.18x),
+        // and tip must also be extended away from MCP (>= 0.92 * dPipMcp)
+        return (dTipWrist > dPipWrist * 1.18) && (dTipMcp > dPipMcp * 0.92);
     }
 
     /**
      * Single-frame gesture classifier:
      * - ✊ FIST: 0 fingers extended -> DUCK
      * - ✌️ TWO FINGERS: Index & Middle up, Ring & Pinky folded -> RUN
-     * - 🖐️ PALM: 3+ fingers open OR rapid upward flick -> JUMP
+     * - 🖐️ PALM: 3+ fingers open (with pinky/ring open) OR deliberate upward flick -> JUMP
      */
     function classifyFrame(landmarks, timestamp) {
         if (!landmarks || landmarks.length < 21) return 'NONE';
 
-        var indexExt = isFingerExtended(landmarks, 8, 6);
-        var middleExt = isFingerExtended(landmarks, 12, 10);
-        var ringExt = isFingerExtended(landmarks, 16, 14);
-        var pinkyExt = isFingerExtended(landmarks, 20, 18);
+        var indexExt = isFingerExtended(landmarks, 8, 6, 5);
+        var middleExt = isFingerExtended(landmarks, 12, 10, 9);
+        var ringExt = isFingerExtended(landmarks, 16, 14, 13);
+        var pinkyExt = isFingerExtended(landmarks, 20, 18, 17);
 
         var count = (indexExt ? 1 : 0) + (middleExt ? 1 : 0) + (ringExt ? 1 : 0) + (pinkyExt ? 1 : 0);
 
-        // Check upward vertical velocity
+        // Filtered upward vertical velocity for flick gesture
         var palmY = (landmarks[0].y + landmarks[9].y) / 2;
         var velocityY = 0;
         if (prevPalmY !== null && prevTimestamp > 0) {
             var dt = (timestamp - prevTimestamp) / 1000;
-            if (dt > 0.01 && dt < 0.25) {
+            if (dt >= 0.02 && dt <= 0.25) {
                 velocityY = (palmY - prevPalmY) / dt;
             }
         }
         prevPalmY = palmY;
         prevTimestamp = timestamp;
 
-        var isUpwardFlick = velocityY < -0.50;
+        // Upward flick requires intentional deliberate speed and upright hand
+        var isUpwardFlick = (velocityY < -0.85) && (count >= 2);
 
         // 1. CLOSED FIST (✊) -> DUCK
         if (count === 0 || (!indexExt && !middleExt && !ringExt && !pinkyExt)) {
             return 'DUCK';
         }
 
-        // 2. TWO FINGERS UP (✌️ Peace/Victory sign) -> RUN
-        if (indexExt && middleExt && !ringExt && !pinkyExt) {
+        // 2. TWO FINGERS UP (✌️ Peace / Victory sign) -> RUN
+        // Index & Middle extended, Pinky folded down.
+        // Giving precedence to RUN prevents borderline ring finger noise from triggering JUMP!
+        if (indexExt && middleExt && !pinkyExt) {
             return 'RUN';
         }
 
-        // 3. OPEN PALM (🖐️ 3+ fingers) OR UPWARD FLICK -> JUMP
-        if (count >= 3 || isUpwardFlick) {
+        // 3. OPEN PALM (🖐️ 3+ fingers including ring or pinky) OR DELIBERATE UPWARD FLICK -> JUMP
+        if ((count >= 3 && (ringExt || pinkyExt)) || isUpwardFlick) {
             return 'JUMP';
         }
 
@@ -176,27 +209,35 @@
     }
 
     /**
-     * Temporal smoothing filter (prevents single-frame glitches)
+     * Temporal smoothing filter (anti-jitter hysteresis):
+     * Maintains a 3-frame sliding buffer.
+     * Requires 2 consecutive frames for any state transition,
+     * which completely eliminates 1-frame jitter, noise spikes, and badge flickering!
      */
     function getSmoothedGesture(rawGesture) {
+        if (rawGesture === 'NONE') {
+            gestureHistory = [];
+            return 'NONE';
+        }
+
         gestureHistory.push(rawGesture);
         if (gestureHistory.length > 3) {
             gestureHistory.shift();
         }
 
-        // JUMP is an instant impulsive action - trigger immediately if detected
-        if (rawGesture === 'JUMP') {
-            return 'JUMP';
-        }
-
-        // For DUCK and RUN, require 2 consecutive votes to prevent flickering
+        var jumpVotes = 0;
         var duckVotes = 0;
         var runVotes = 0;
+
         for (var i = 0; i < gestureHistory.length; i++) {
+            if (gestureHistory[i] === 'JUMP') jumpVotes++;
             if (gestureHistory[i] === 'DUCK') duckVotes++;
             if (gestureHistory[i] === 'RUN') runVotes++;
         }
 
+        // 2 consecutive votes required to switch state:
+        // ~60ms response time at 30 FPS (imperceptible to human), 100% stable
+        if (jumpVotes >= 2) return 'JUMP';
         if (duckVotes >= 2) return 'DUCK';
         if (runVotes >= 2) return 'RUN';
 
@@ -229,9 +270,10 @@
         var detectedGesture = 'NONE';
 
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            var landmarks = results.multiHandLandmarks[0];
+            // Apply Exponential Moving Average (EMA) to eliminate landmark sensor jitter
+            var landmarks = smoothLandmarks(results.multiHandLandmarks[0]);
 
-            // Render neon wireframe skeleton
+            // Render neon wireframe skeleton (super smooth & steady!)
             drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00ffcc', lineWidth: 2 });
             drawLandmarks(canvasCtx, landmarks, { color: '#ff007f', lineWidth: 1, radius: 3 });
 
@@ -240,6 +282,7 @@
             currentStableGesture = detectedGesture;
         } else {
             prevPalmY = null;
+            smoothedLandmarks = null;
             gestureHistory = [];
         }
 
@@ -316,6 +359,12 @@
         videoLoopTimer = setTimeout(function () {
             if (!isActive) return;
 
+            // Pause processing when browser tab is inactive to preserve mobile performance
+            if (document.hidden) {
+                scheduleNextAiFrame();
+                return;
+            }
+
             if (videoElement && videoElement.readyState >= 2 && !isProcessingFrame) {
                 isProcessingFrame = true;
                 hands.send({ image: videoElement }).catch(function (e) {
@@ -348,22 +397,23 @@
                 }
             });
 
-            // Fast Lite Model
+            // Fast Lite Model with robust noise-filtering thresholds
             hands.setOptions({
                 maxNumHands: 1,
                 modelComplexity: 0,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
+                minDetectionConfidence: 0.6,
+                minTrackingConfidence: 0.6
             });
 
             hands.onResults(onResults);
 
-            // Access webcam with 320x240 optimal resolution
+            // Access webcam with front selfie camera preference (vital on mobile)
             var stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    width: { ideal: 320 },
-                    height: { ideal: 240 },
-                    frameRate: { ideal: 30 }
+                    facingMode: 'user',
+                    width: { ideal: 320, max: 480 },
+                    height: { ideal: 240, max: 360 },
+                    frameRate: { ideal: 30, max: 30 }
                 },
                 audio: false
             });
@@ -433,9 +483,12 @@
         gestureHud.id = 'ai-gesture-hud';
         gestureHud.className = 'ai-hud hidden';
         gestureHud.innerHTML = 
-            '<div class="ai-hud-header">' +
-                '<span class="ai-hud-title">⚡ DINO VISION AI v4</span>' +
-                '<span id="ai-hud-fps">30 FPS</span>' +
+            '<div class="ai-hud-header" id="ai-hud-header-bar">' +
+                '<span class="ai-hud-title">⚡ DINO VISION v4.1</span>' +
+                '<div class="ai-hud-controls">' +
+                    '<span id="ai-hud-fps">30 FPS</span>' +
+                    '<button id="ai-hud-min-btn" class="ai-hud-icon-btn" title="Minimize / Expand Video Preview">−</button>' +
+                '</div>' +
             '</div>' +
             '<div class="ai-canvas-wrap">' +
                 '<video id="ai-webcam-feed" playsinline style="display:none;"></video>' +
@@ -449,6 +502,29 @@
             '</div>';
 
         document.body.appendChild(gestureHud);
+
+        // Prevent touch/click interactions on the HUD from causing accidental jumps on the game canvas
+        ['touchstart', 'touchend', 'mousedown', 'click'].forEach(function (evtName) {
+            gestureHud.addEventListener(evtName, function (e) {
+                e.stopPropagation();
+            });
+        });
+
+        // Minimize / Expand HUD Preview Toggle
+        var minBtn = document.getElementById('ai-hud-min-btn');
+        var headerBar = document.getElementById('ai-hud-header-bar');
+
+        function toggleMinimize(e) {
+            if (e) e.stopPropagation();
+            var isMin = gestureHud.classList.toggle('minimized');
+            if (minBtn) {
+                minBtn.innerHTML = isMin ? '＋' : '−';
+                minBtn.title = isMin ? 'Expand Video Preview' : 'Minimize Video Preview';
+            }
+        }
+
+        if (minBtn) minBtn.addEventListener('click', toggleMinimize);
+        if (headerBar) headerBar.addEventListener('dblclick', toggleMinimize);
 
         videoElement = document.getElementById('ai-webcam-feed');
         canvasElement = document.getElementById('ai-skeleton-canvas');
