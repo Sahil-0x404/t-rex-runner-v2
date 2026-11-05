@@ -965,7 +965,10 @@
      * @param {number}
      */
     function getRandomNum(min, max) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
+        var rnd = (window.DuelRunner && typeof window.DuelRunner.seededRandom === 'function')
+            ? window.DuelRunner.seededRandom()
+            : Math.random();
+        return Math.floor(rnd * (max - min + 1)) + min;
     }
 
 

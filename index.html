@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="css/style.css?v=3.1">
+    <link rel="stylesheet" href="css/style.css?v=3.2">
 </head>
 
 <body id="t" class="offline">
@@ -30,6 +30,7 @@
 
       <div class="menu-buttons">
         <button id="jg-play-btn" class="jg-btn jg-btn-primary">▶&nbsp; PLAY GAME</button>
+        <button id="jg-duel-btn" class="jg-btn jg-btn-duel">⚔️&nbsp; 1v1 DUEL</button>
         <button id="jg-lb-btn-start" class="jg-btn jg-btn-secondary">🏆&nbsp; TOP 5</button>
       </div>
 
@@ -142,7 +143,7 @@
   <!-- Firebase Realtime Database SDKs for Global Leaderboard Sync -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <script src="js/script.js?v=2.8"></script>
+  <script src="js/script.js?v=2.9"></script>
   <script src="js/jungle-bg.js?v=2.8"></script>
   <script src="js/jungle-theme.js?v=2.8"></script>
   <script src="js/ghost-runner.js?v=2.0"></script>
@@ -152,6 +153,92 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   <script src="js/gesture-controller.js?v=4.1"></script>
+  <script src="js/multiplayer-duel.js?v=1.0"></script>
+
+
+  <!-- ══════════════════════════════════════════════════════════
+       1v1 MULTIPLAYER DUEL MODAL
+       ══════════════════════════════════════════════════════════ -->
+  <div id="jungle-duel-modal" class="jungle-overlay hidden">
+    <div class="jungle-panel duel-panel">
+      <div class="title-emoji">⚔️</div>
+      <h1 class="game-title duel-title">1v1 DUEL</h1>
+      <h2 class="game-subtitle">SYNCHRONIZED TRACK RACE</h2>
+
+      <!-- Tabs: Create or Join -->
+      <div class="duel-tabs">
+        <button id="duel-tab-create" class="duel-tab active">CREATE ROOM</button>
+        <button id="duel-tab-join" class="duel-tab">JOIN ROOM</button>
+      </div>
+
+      <!-- Tab Content: Create Room -->
+      <div id="duel-view-create" class="duel-view">
+        <p class="duel-info-text">Share this room code with a friend to race together:</p>
+        <div class="duel-code-box">
+          <span class="duel-code-label">ROOM CODE:</span>
+          <span id="duel-created-code" class="duel-code-value">------</span>
+          <button id="duel-copy-link-btn" class="jg-btn jg-btn-small" title="Copy Invite Link">📋 COPY LINK</button>
+        </div>
+        <div id="duel-host-status" class="duel-status-box">
+          <div class="duel-spinner"></div>
+          <span>Waiting for challenger to connect...</span>
+        </div>
+      </div>
+
+      <!-- Tab Content: Join Room -->
+      <div id="duel-view-join" class="duel-view hidden">
+        <p class="duel-info-text">Enter the 5-character room code from your friend:</p>
+        <div class="duel-input-group">
+          <input type="text" id="duel-join-code-input" class="new-hs-input duel-code-input" placeholder="e.g. DINO7" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="characters" />
+          <button id="duel-join-btn" class="jg-btn jg-btn-primary">ENTER DUEL</button>
+        </div>
+        <div id="duel-join-error" class="new-hs-error hidden" style="margin-top: 10px;"></div>
+      </div>
+
+      <!-- Match Lobby (Visible when both players connected) -->
+      <div id="duel-view-lobby" class="duel-view hidden">
+        <div class="duel-vs-card">
+          <div class="duel-player-card p1-card">
+            <span class="p-role">HOST</span>
+            <span id="duel-p1-name" class="p-name">Player 1</span>
+            <span id="duel-p1-status" class="p-status">READY ✅</span>
+          </div>
+          <div class="duel-vs-badge">VS</div>
+          <div class="duel-player-card p2-card">
+            <span class="p-role">GUEST</span>
+            <span id="duel-p2-name" class="p-name">Player 2</span>
+            <span id="duel-p2-status" class="p-status">WAITING...</span>
+          </div>
+        </div>
+        <button id="duel-ready-btn" class="jg-btn jg-btn-primary" style="margin-top: 14px; width: 100%;">⚡ START RACE</button>
+      </div>
+
+      <!-- Close / Back button -->
+      <button id="duel-close-btn" class="jg-btn jg-btn-secondary" style="margin-top: 15px; width: 100%;">🔙 BACK TO MENU</button>
+    </div>
+  </div>
+
+  <!-- Synchronized 3-2-1 Countdown Overlay -->
+  <div id="duel-countdown-overlay" class="jungle-overlay hidden" style="background: rgba(0,0,0,0.85); z-index: 9999;">
+    <div class="duel-countdown-wrap">
+      <div id="duel-countdown-number" class="duel-countdown-num">3</div>
+      <div class="duel-countdown-sub">GET READY TO SPRINT!</div>
+    </div>
+  </div>
+
+  <!-- Victory / Defeat Climax Overlay -->
+  <div id="duel-result-modal" class="jungle-overlay hidden" style="z-index: 9999;">
+    <div class="jungle-panel duel-result-panel">
+      <div id="duel-result-emoji" class="title-emoji">👑</div>
+      <h1 id="duel-result-title" class="game-title">VICTORY!</h1>
+      <p id="duel-result-desc" class="game-subtitle">YOU OUTRAN YOUR OPPONENT!</p>
+      <div id="duel-result-stats" class="duel-stats-summary"></div>
+      <div class="menu-buttons" style="margin-top: 15px;">
+        <button id="duel-rematch-btn" class="jg-btn jg-btn-primary">🔁 REMATCH</button>
+        <button id="duel-exit-btn" class="jg-btn jg-btn-secondary">🚪 EXIT DUEL</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
