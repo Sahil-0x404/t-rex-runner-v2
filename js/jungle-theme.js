@@ -382,6 +382,14 @@
     if (origHandleEvent) {
       Runner.prototype.handleEvent = function (e) {
         if (isAnyOverlayOpen()) {
+          // Allow Space or Up arrow to launch gameplay from the Start Menu
+          var startMenu = document.getElementById('jungle-start-menu');
+          var startVis = startMenu && !startMenu.classList.contains('hidden');
+          if (startVis && e.type === 'keydown' && (e.keyCode === 32 || e.keyCode === 38)) {
+            if (e.preventDefault) e.preventDefault();
+            startGameplay();
+            return;
+          }
           return;
         }
         origHandleEvent.call(this, e);
@@ -391,10 +399,20 @@
     var origKeyDown = Runner.prototype.onKeyDown;
     if (origKeyDown) {
       Runner.prototype.onKeyDown = function (e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+        // Auto-start game on Space (32) or Up (38) from Start Menu
+        var startMenu = document.getElementById('jungle-start-menu');
+        var startVis = startMenu && !startMenu.classList.contains('hidden');
+        if (startVis && (e.keyCode === 32 || e.keyCode === 38)) {
+          e.preventDefault();
+          startGameplay();
+          return;
+        }
+
         if (isAnyOverlayOpen()) {
           return;
         }
-        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
         if (!this.playing || this.crashed) {
           return;
         }
@@ -1165,8 +1183,10 @@
   window.JungleTheme = {
     getDinoFrame: getDinoFrame,
     frames: frames,
-    Leaderboard: Leaderboard
+    Leaderboard: Leaderboard,
+    startGameplay: startGameplay
   };
+  window.startGameplay = startGameplay;
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

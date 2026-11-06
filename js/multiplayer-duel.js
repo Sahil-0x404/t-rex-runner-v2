@@ -339,10 +339,43 @@
 
         // Launch game with synchronized obstacle track
         if (window.Runner && Runner.instance_) {
-            var runner = Runner.instance_;
-            runner.restart();
-            runner.playing = true;
-            runner.activated = true;
+            var r = Runner.instance_;
+            if (r.raqId) {
+                cancelAnimationFrame(r.raqId);
+                r.raqId = 0;
+            }
+            r.crashed = false;
+            r.playingIntro = false;
+            r.activated = true;
+            r.runningTime = 0;
+            r.currentSpeed = r.config.SPEED;
+            r.distanceRan = 0;
+
+            if (r.containerEl) {
+                r.containerEl.classList.remove(Runner.classes.CRASHED);
+                r.containerEl.style.width = r.dimensions.WIDTH + 'px';
+            }
+            if (r.horizon) {
+                r.horizon.obstacles = [];
+                r.horizon.reset();
+            }
+            if (r.distanceMeter) {
+                r.distanceMeter.reset(r.highestScore);
+            }
+            if (r.tRex) {
+                r.tRex.reset();
+                r.tRex.playingIntro = false;
+                r.tRex.status = Trex.status.RUNNING;
+            }
+            try { r.loadSounds(); } catch (e) {}
+            r.playing = true;
+            r.clearCanvas();
+            r.startGame();
+            r.update();
+            if (r.tRex && !r.tRex.jumping) {
+                r.playSound(r.soundFx ? r.soundFx.BUTTON_PRESS : 'BUTTON_PRESS');
+                r.tRex.startJump(r.currentSpeed);
+            }
         }
 
         // Host updates room state to 'racing'
@@ -741,6 +774,7 @@
         resetSeed: resetSeed,
         open: openLobbyModal,
         leave: leaveDuel,
+        launch: launchDuelRace,
         isActive: function () { return isDuelActive; }
     };
 })();
